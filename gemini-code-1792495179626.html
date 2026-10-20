@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schnitzeljagd 2026 – Messdiener St. Laurentius Odenkirchen</title>
+  
+  <!-- Tailwind CSS & FontAwesome Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- QR Code Libraries (Offline Support & Camera Scan) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#081c15',
+              green: '#1b4332',
+              accent: '#2d6a4f',
+              light: '#d8f3dc',
+              gold: '#d4af37',
+              goldLight: '#f39c12'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #081c15; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+    .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f39c12 100%); }
+    .gold-text { background: linear-gradient(135deg, #f39c12 0%, #d4af37 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .glass-panel { background: rgba(27, 67, 50, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(212, 175, 55, 0.2); }
+    .option-btn { transition: all 0.2s ease; border: 1px solid rgba(212, 175, 55, 0.3); }
+    .option-btn:hover { border-color: #d4af37; background: rgba(212, 175, 55, 0.1); }
+    .option-btn.selected-correct { background-color: #15803d !important; border-color: #22c55e !important; color: white !important; }
+    .option-btn.selected-wrong { background-color: #b91c1c !important; border-color: #ef4444 !important; color: white !important; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <!-- Header -->
+  <header class="bg-brand-green border-b border-brand-gold/30 sticky top-0 z-40 shadow-lg">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <i class="fa-solid font-bold fa-compass text-brand-gold text-2xl"></i>
+        <div>
+          <h1 class="font-bold text-lg leading-tight gold-text">Schnitzeljagd 2026</h1>
+          <p class="text-xs text-brand-light/70">Messdiener St. Laurentius Odenkirchen</p>
+        </div>
+      </div>
+      <div id="sync-status-badge" class="bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Offline Bereit
+      </div>
+    </div>
+    
+    <!-- Main Navigation Tabs -->
+    <div class="max-w-5xl mx-auto px-2 flex overflow-x-auto no-scrollbar border-t border-brand-gold/10 bg-brand-dark/50">
+      <button onclick="switchTab('p1')" id="nav-p1" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-brand-gold">Posten 1</button>
+      <button onclick="switchTab('p2')" id="nav-p2" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-brand-gold">Posten 2</button>
+      <button onclick="switchTab('p3')" id="nav-p3" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-brand-gold">Posten 3</button>
+      <button onclick="switchTab('p4')" id="nav-p4" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-brand-gold">Posten 4</button>
+      <button onclick="switchTab('p5')" id="nav-p5" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-brand-gold">Posten 5</button>
+      <button onclick="switchTab('spielleiter')" id="nav-spielleiter" class="nav-tab flex-1 min-w-[110px] py-2.5 px-3 text-xs font-bold text-center border-b-2 border-transparent text-brand-gold/80 hover:text-brand-gold bg-brand-gold/10">Spielleiter</button>
+      <button onclick="switchTab('sync')" id="nav-sync" class="nav-tab flex-1 min-w-[100px] py-2.5 px-3 text-xs font-semibold text-center border-b-2 border-transparent text-cyan-400 hover:text-cyan-300"><i class="fa-solid fa-rotate"></i> Sync</button>
+    </div>
+  </header>
+
+  <!-- Container -->
+  <main class="max-w-4xl mx-auto px-4 mt-6">
+    <div id="app-content"></div>
+  </main>
+
+  <!-- JavaScript Code -->
+  <script>
+    // State Management
+    const DB_KEY = 'schnitzeljagd_2026_data';
+    let appData = {
+      teams: ['Gruppe Alpha', 'Gruppe Beta', 'Gruppe Gamma'],
+      scores: {} // { teamName: { p1: { prevTask: 0, q1: 1, ..., postTask: 2 }, p2: ... } }
+    };
+
+    // Database Contents
+    const POSTEN_DATA = {
+      p1: {
+        title: "Posten 1 – Logik",
+        material: "3 Flaschen mit Maßangabe (300, 400, 500 ml), Messbecher (mind. 1 l), 1,5-l-Wasserflasche (still, voll)",
+        prevTaskText: "Eingabe der mitgebrachten Punkte vom vorherigen Posten (falls vorhanden).",
+        hasPrevTask: false,
+        questions: [
+          { id: 'q1', type: 'open', title: '1. Blumen für die Mütter', text: 'Rose, Iris und Lilly haben die Blumen für ihre Mütter gekauft: die Rosen, die Iris und die Lilien. „Das ist so toll!“, sagte das Mädchen mit den Rosen. „Wir haben die Rosen, die Iris und die Lilien gekauft, aber keine von uns hat die Blumen gekauft, die wie ihr Name klingen.“ „Du hast ja so recht!“, fügte Lilly hinzu. Welche Blumen hat jedes der Mädchen gekauft?', answer: 'Rose kaufte die Lilien, Lilly kaufte die Iris und Iris kaufte die Rosen.', exp: 'Keines der Mädchen hat die Blumen gekauft, die wie ihr Name klingen. Das Mädchen mit den Rosen ist nicht Rose und nicht Lilly (antwortet). Also hat Iris die Rosen gekauft. Rose bleiben die Lilien und Lilly die Iris.' },
+          { id: 'q2', type: 'open', title: '2. Sie sind kein Ehepaar', text: 'Ein Mann und eine Frau sitzen auf der Bank im Park. Ein anderer Mann fragt: „Seid ihr Mann und Frau?“ Die Frau antwortet: „Wir sind zwar kein Ehepaar, aber meine Mutter hat seine Mutter geboren.“ In welcher Beziehung stehen sie zueinander?', answer: 'Sie sind Tante und Neffe.', exp: 'Die Mutter der Frau hat die Mutter des Mannes zur Welt gebracht. Die beiden Mütter sind Mutter und Tochter. Die Frau und die Mutter des Mannes sind Schwestern. Damit ist die Frau die Tante und er ihr Neffe.' },
+          { id: 'q3', type: 'open', title: '3. Im Obstgarten', text: 'Blattläuse haben einen Obstgarten angegriffen. Jeden Tag wurden doppelt so viele Obstbäume angegriffen wie am Tag zuvor. Nach 6 Tagen war der ganze Obstgarten befallen. Nach wie vielen Tagen wurde der halbe Obstgarten befallen?', answer: 'Nach 5 Tagen.', exp: 'Die Zahl verdoppelt sich jeden Tag. Am 6. Tag war der ganze Garten befallen – am Tag davor (5. Tag) war es also genau die Hälfte.' },
+          { id: 'q4', type: 'open', title: '4. Wer ist der Lehrer?', text: 'Die Berufe von Hans, Peter und Franz sind Arzt, Rechtsanwalt und Lehrer. Der Lehrer ist Einzelkind und verdient am wenigsten. Franz, der die Schwester von Hans geheiratet hat, verdient mehr als der Arzt. Finde heraus, wer der Lehrer ist!', answer: 'Hans ist Arzt, Franz ist Rechtsanwalt und Peter ist Lehrer.', exp: 'Franz hat Hans\' Schwester geheiratet -> Hans ist kein Einzelkind (nicht Lehrer). Franz verdient mehr als der Arzt -> Franz nicht Arzt/Lehrer. Franz = Rechtsanwalt. Hans = Arzt, Peter = Lehrer.' },
+          { id: 'q5', type: 'open', title: '5. Kisten', text: 'Auf 3 Kisten (2 leer, 1 mit Geld) klebt je ein Aufkleber. Genau einer ist wahr:\n1: „Geld ist da.“\n2: „Geld ist nicht hier.“\n3: „Das Geld ist nicht in der ersten Kiste.“\nWelche Kiste muss gewählt werden?', answer: 'Die zweite Kiste.', exp: 'Liegt das Geld in Kiste 2, ist nur Aufkleber 3 wahr (1 und 2 sind falsch). Das erfüllt die Bedingung, dass genau ein Aufkleber wahr ist.' },
+          { id: 'q6', type: 'open', title: '6. Wie viele Kinder sind es?', text: 'Jedes Kind in einer Familie hat mindestens 3 Brüder und 3 Schwestern. Wie viele Kinder hat diese Familie mindestens?', answer: 'Mindestens 8 Kinder (4 Jungen und 4 Mädchen).', exp: 'Jeder Junge braucht 3 BRÜDER -> mind. 4 Jungen. Jedes Mädchen braucht 3 SCHWESTERN -> mind. 4 Mädchen. Zusammen mind. 8 Kinder.' },
+          { id: 'q7', type: 'open', title: '7. Schwer zu erklären', text: 'Erik hat gestern 500 Euro von seinem Vater bekommen und Dietmar 200 Euro von seinem Vater. Trotzdem haben sie zusammen statt 700 Euro nur 500 Euro mehr als bisher. Wie ist das möglich?', answer: 'Erik ist Dietmars Vater.', exp: 'Dietmar bekommt 200 € von Erik. Das Geld war vorher schon da. Neu sind nur die 500 €, die Erik von seinem Vater bekommen hat.' },
+          { id: 'q8', type: 'open', title: '8. Der Geburtstag', text: '„Vorgestern war ich noch 25 Jahre alt, aber nächstes Jahr werde ich 28.“ Das ist nur an einem Tag im Jahr möglich. Wann ist der Mann geboren?', answer: 'Geburtstag: 31. Dezember. Gespräch findet am 1. Januar statt.', exp: 'Am 30.12. war er 25. Am 31.12. wird er 26. In diesem Jahr am 31.12. wird er 27, nächstes Jahr 28.' }
+        ],
+        postTaskTitle: "POSTENAUFGABE: 400 ML ABMESSEN",
+        postTaskText: "Die Kinder erhalten 500ml und 300ml Gefäße & 1l Wasser. Genau 400ml abmessen ohne zu verschütten! (Maximal 3,0 Punkte).",
+        nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Beim nächsten Posten geht es um Natur und Wald. Übt Tiergeräusche (mindestens 5) und macht sie dort vor."
+      },
+      p2: {
+        title: "Posten 2 – Natur",
+        material: "4 Eier, Box, Handzettel, Zeigezettel",
+        hasPrevTask: true,
+        prevTaskTitle: "Mitgebrachte Aufgabe: Tiergeräusche vorführen",
+        prevTaskDesc: "Die Gruppe führt mindestens 5 geübte Tiergeräusche vor (0.0 bis 3.0 Punkte).",
+        questions: [
+          { id: 'q1', type: 'mc', title: '1. In welcher Position schlafen Pferde tief und fest?', options: ['A) im Stehen', 'B) im Liegen', 'C) an der Stallwand lehnend', 'D) sitzend (wie ein Hund)'], correct: 'B', exp: 'Für den Tiefschlaf erschlafft die Muskulatur so stark, dass sich Pferde hinlegen müssen.' },
+          { id: 'q2', type: 'mc', title: '2. Welches Obst wird weltweit am meisten gegessen?', options: ['A) Banane', 'B) Orange', 'C) Apfel', 'D) Traube'], correct: 'A', exp: 'Die Banane wird weltweit am meisten angebaut und gegessen.' },
+          { id: 'q3', type: 'mc', title: '3. Wie tief taucht ein Pottwal normalerweise?', options: ['A) 500 m', 'B) 1000 m', 'C) 1500 m', 'D) 2000 m'], correct: 'B', exp: 'Pottwale tauchen auf der Jagd nach Tintenfischen ca. 400 bis 1000 Meter tief.' },
+          { id: 'q4', type: 'mc', title: '4. Wie heißt das ausgedehnte Wurzelgeflecht der Pilze?', options: ['A) Chlorophyll', 'B) Myzel', 'C) Pfifferling', 'D) Ribosom'], correct: 'B', exp: 'Das Myzel ist das weit verzweigte Fadengeflecht im Boden.' },
+          { id: 'q5', type: 'mc', title: '5. Hauptgrund für das Absterben der Kiefern-Wald-Monokulturen in Deutschland?', options: ['A) Borkenkäfer und Trockenheit', 'B) Wurzelfäule', 'C) Eichenprozessionsspinner', 'D) zu wenig CO₂ in der Luft'], correct: 'A', exp: 'Trockenheit schwächt die Bäume, Borkenkäfer haben leichtes Spiel.' },
+          { id: 'q6', type: 'mc', title: '6. Was ist die größte Wüste der Welt?', options: ['A) Gobi', 'B) Sahara', 'C) Antarktis', 'D) Atacama'], correct: 'C', exp: 'Die Antarktis ist mit 14 Mio. km² die größte (Kälte-)Wüste der Erde.' },
+          { id: 'q7', type: 'mc', title: '7. Warum verfärbt sich das Laub der Bäume?', options: ['A) Licht lässt Blätter weniger grün erscheinen', 'B) Das grüne Chlorophyll wird in den Stamm eingelagert', 'C) Es bilden sich vermehrt gelbe/rote Farbstoffe', 'D) Menschen haben Bäume so gezüchtet'], correct: 'B', exp: 'Chlorophyll wird entzogen und eingelagert, andere Farbstoffe kommen zum Vorschein.' },
+          { id: 'q8', type: 'mc', title: '8. Warum pflanzten die Preußen im 19. Jahrhundert Fichten an?', options: ['A) Resistenter gegen Eiszeit', 'B) Pilzflechte raffte Eichen/Buchen dahin', 'C) Fichten wachsen gerade und schnell', 'D) Ästhetisch ansprechender'], correct: 'C', exp: 'Fichten liefern schnell viel gerade gewachsenes Bauholz.' },
+          { id: 'q9', type: 'mc', title: '9. Welches dieser Tiere ist eine invasive Art?', options: ['A) Rothirsch', 'B) Wanderfalke', 'C) Kohlmeise', 'D) Waschbär'], correct: 'D', exp: 'Der Waschbär stammt aus Nordamerika und verdrängt heimische Arten.' },
+          { id: 'q10', type: 'mc', title: '10. Bei der Photosynthese wird was umgewandelt?', options: ['A) Licht + CO₂ + Wasser → Sauerstoff + Glucose', 'B) Licht + CO₂ → Sauerstoff', 'C) Licht + CO₂ → Sauerstoff + Chlorophyll', 'D) Licht + CO₂ + Chlorophyll → Sauerstoff + Wasser'], correct: 'A', exp: 'Pflanzen wandeln CO2, Wasser und Licht in Traubenzucker und Sauerstoff um.' }
+        ],
+        postTaskTitle: "POSTENAUFGABE: TIERGERÄUSCHE RATEN",
+        postTaskText: "Spiele die 15 Tiergeräusche aus der Cloud ab. Bewertet wird die Anzahl der richtig erratenen Tiere (0.0 bis 3.0 Punkte).",
+        nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Ihr bekommt ein rohes Ei und transportiert es zum nächsten Posten, ohne dass es beschädigt wird."
+      },
+      p3: {
+        title: "Posten 3 – Technik und Wissenschaft",
+        material: "1 Esslöffel, etwas Flatterband",
+        hasPrevTask: true,
+        prevTaskTitle: "Mitgebrachte Aufgabe: Rohes Ei transportiert",
+        prevTaskDesc: "Ist das Ei heile am Posten angekommen? (Bewertung 0.0 bis 3.0 Punkte).",
+        questions: [
+          { id: 'q1', type: 'mc', title: '1. Ziel des „Manhattan Project“ 1942?', options: ['A) Bekämpfung der Slums', 'B) Bau einer Weltraumrakete', 'C) Bau der Atombombe'], correct: 'C', exp: 'Wissenschaftler arbeiteten unter J. Robert Oppenheimer an der ersten Atombombe.' },
+          { id: 'q2', type: 'mc', title: '2. Wer erfand 1879 die erste brauchbare elektrische Lampe?', options: ['A) George Eastman', 'B) Thomas Alva Edison', 'C) James Watt'], correct: 'B', exp: 'Edisons Glühlampe brannte erstmals lange genug für den Alltagsgebrauch.' },
+          { id: 'q3', type: 'mc', title: '3. Stein fällt 45 Min in Loch zum Erdmittelpunkt. Was verändert sich?', options: ['A) Stein ist verschwunden', 'B) Stein ist zerfallen', 'C) Stein hat kein Gewicht mehr'], correct: 'C', exp: 'Im Erdmittelpunkt heben sich alle Gravitationskräfte auf – der Stein ist schwerelos.' },
+          { id: 'q4', type: 'mc', title: '4. Sternentyp als Voraussetzung für ein Schwarzes Loch?', options: ['A) ein Gasriese', 'B) ein blauer Riese', 'C) eine Sonne'], correct: 'B', exp: 'Ein blauer Riese entwickelt sich aus besonders massereichen Sternen.' },
+          { id: 'q5', type: 'mc', title: '5. Wann kam das allererste Smartphone (IBM Simon) auf den Markt?', options: ['A) 1989', 'B) 1994', 'C) 1999', 'D) 2004'], correct: 'B', exp: 'Das IBM Simon kam 1994 in den USA heraus – 13 Jahre vor dem iPhone.' },
+          { id: 'q6', type: 'mc', title: '6. Erfinder des ersten funktionsfähigen Computers (Z3 1941)?', options: ['A) Alan Turing', 'B) Konrad Zuse', 'C) Bill Gates', 'D) Steve Wozniak'], correct: 'B', exp: 'Konrad Zuse baute 1941 den ersten programmgesteuerten Computer Z3.' },
+          { id: 'q7', type: 'mc', title: '7. Was machte Netflix vor dem Streaming-Dienst?', options: ['A) Film-Enzyklopädie', 'B) Internet-Provider', 'C) Bezahldienst', 'D) Online-Videothek mit Versand'], correct: 'D', exp: 'Netflix versendete ursprünglich DVDs per Post.' },
+          { id: 'q8', type: 'mc', title: '8. Was fiel Isaac Newton auf den Kopf?', options: ['A) Vogelkot', 'B) Stein', 'C) Bratpfanne', 'D) Apfel'], correct: 'D', exp: 'Ein fallender Apfel inspirierte Newton zur Erforschung der Schwerkraft.' },
+          { id: 'q9', type: 'mc', title: '9. Womit können Fingerabdrücke sichtbar gemacht werden?', options: ['A) mit Grafitpulver', 'B) mit warmem Wasser', 'C) mit grünem Licht', 'D) mit monochromatischem Licht'], correct: 'A', exp: 'Feines Grafitpulver bleibt an Hautfett und Schweiß haften.' },
+          { id: 'q10', type: 'mc', title: '10. Wer gilt als Erfinder des Buchdrucks?', options: ['A) Johannes Gutenberg', 'B) Leonardo da Vinci', 'C) Thomas More', 'D) Martin Luther'], correct: 'A', exp: 'Gutenberg erfand um 1450 den Buchdruck mit beweglichen Metalllettern.' }
+        ],
+        postTaskTitle: "POSTENAUFGABE: EIERLAUF",
+        postTaskText: "Eierlauf auf Zeit (2 Minuten). Wechselnde Läufer mit dem mitgebrachten Ei. Geht das Ei kaputt, endet das Spiel (0.0 bis 3.0 Punkte).",
+        nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Macht am Gipfelkreuz Gruppenfotos, zeigt sie dem nächsten Posten und schickt sie an Arne."
+      },
+      p4: {
+        title: "Posten 4 – Geographie",
+        material: "Keines",
+        hasPrevTask: true,
+        prevTaskTitle: "Mitgebrachte Aufgabe: Gipfelkreuz-Fotos",
+        prevTaskDesc: "Wurden schöne Gruppenfotos am Gipfelkreuz vorgezeigt? (0.0 bis 3.0 Punkte).",
+        questions: [
+          { id: 'q1', type: 'mc', title: '1. Wie heißt die Hauptstadt von Indien?', options: ['A) Mumbai', 'B) Neu-Delhi', 'C) Taj Mahal', 'D) Kolkata'], correct: 'B', exp: 'Neu-Delhi ist der Regierungssitz Indiens.' },
+          { id: 'q2', type: 'mc', title: '2. Auf welchem Kontinent liegt der Amazonas-Regenwald?', options: ['A) Südamerika', 'B) Nordamerika', 'C) Afrika', 'D) Australien'], correct: 'A', exp: 'Der Amazonas-Regenwald liegt in Südamerika.' },
+          { id: 'q3', type: 'mc', title: '3. Welche beiden Flüsse treffen in Koblenz aufeinander?', options: ['A) Main und Donau', 'B) Spree und Neiße', 'C) Oder und Elbe', 'D) Rhein und Mosel'], correct: 'D', exp: 'Am Deutschen Eck mündet die Mosel in den Rhein.' },
+          { id: 'q4', type: 'mc', title: '4. Ist Australien ein Kontinent oder ein Staat?', options: ['A) Kontinent', 'B) Staat', 'C) Beides', 'D) Keines'], correct: 'C', exp: 'Australien ist sowohl ein Staat als auch ein Kontinent.' },
+          { id: 'q5', type: 'mc', title: '5. Warum geht die Sonne am Pol im Sommer nie unter?', options: ['A) Kälte verzerrt Horizont', 'B) Weil die Erde leicht geneigt ist', 'C) Gibt keinen Polartag', 'D) Ozonloch lässt Sonne durch'], correct: 'B', exp: 'Die Erdachse ist um 23,4° geneigt.' },
+          { id: 'q6', type: 'mc', title: '6. Meerenge zwischen Großbritannien und Frankreich?', options: ['A) Hosenkanal', 'B) Ärmelkanal', 'C) Sockenkanal', 'D) Kapuzenkanal'], correct: 'B', exp: 'Der Ärmelkanal (La Manche) trennt Großbritannien von Frankreich.' },
+          { id: 'q7', type: 'mc', title: '7. In welcher Stadt steht das höchste Gebäude der Welt?', options: ['A) Abu Dhabi', 'B) Paris', 'C) New York', 'D) Dubai'], correct: 'D', exp: 'Der Burj Khalifa steht in Dubai (828 Meter).' },
+          { id: 'q8', type: 'open', title: '8. Zählt mindestens 8 Bundesländer auf!', text: 'Nenne mindestens 8 deutsche Bundesländer.', answer: '16 Bundesländer zur Auswahl (z.B. NRW, Bayern, Hessen, Berlin...).', exp: '8 ordnungsgemäß genannte Bundesländer ergeben die vollen Punkte.' },
+          { id: 'q9', type: 'mc', title: '9. Welches Land liegt zwischen Österreich und der Schweiz?', options: ['A) Liechtenstein', 'B) Andorra', 'C) Angola', 'D) Italien'], correct: 'A', exp: 'Liechtenstein ist das Fürstentum zwischen Österreich und der Schweiz.' },
+          { id: 'q10', type: 'mc', title: '10. Welches ist das südlichste Land in Afrika?', options: ['A) Lesotho', 'B) Tansania', 'C) Südafrika', 'D) Simbabwe'], correct: 'C', exp: 'Südafrika bildet die geografische Südspitze Afrikas.' }
+        ],
+        postTaskTitle: "POSTENAUFGABE: DEUTSCHLANDKARTE AUS STÖCKEN",
+        postTaskText: "Baut innerhalb von 3 Minuten eine Deutschlandkarte aus Waldstöcken nach (0.0 bis 3.0 Punkte).",
+        nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Entwerft auf dem Weg ein Gedicht über die Messdiener und tragt es vor!"
+      },
+      p5: {
+        title: "Posten 5 – Messdiener",
+        material: "Keines",
+        hasPrevTask: true,
+        prevTaskTitle: "Mitgebrachte Aufgabe: Messdiener-Gedicht",
+        prevTaskDesc: "Wurde ein selbstgedichtetes Messdiener-Gedicht vorgetragen? (0.0 bis 3.0 Punkte).",
+        questions: [
+          { id: 'q1', type: 'open', title: '1. Welche drei Gemeinden gehören aktuell zu unserer Pfarre?', text: 'Nenne die 3 Gemeinden der Pfarre.', answer: 'St. Laurentius, St. Michael und Heilig Geist', exp: 'Alle 3 Gemeinden gehören zur gemeinsamen Pfarre.' },
+          { id: 'q2', type: 'open', title: '2. Zählt 5 Apostel von Jesus auf!', text: 'Nenne 5 beliebige Apostel.', answer: 'Petrus, Andreas, Jakobus, Johannes, Philippus, Bartholomäus, Matthäus, Thomas, Thaddäus, Simon, Judas, Matthias, Paulus', exp: 'Mindestens 5 Korrekte nennen.' },
+          { id: 'q3', type: 'open', title: '3. Was unterscheidet einen Diakon primär von einem Pfarrer?', text: 'Hauptunterschied Diakon / Priester?', answer: 'Eine Weihestufe unter Priester; darf keine Eucharistie (Wandlung) feiern.', exp: 'Diakone dürfen taufen und trauen, aber keine Messe wandeln.' },
+          { id: 'q4', type: 'open', title: '4. In welchem Bistum befindet sich unsere Pfarre?', text: 'Name unseres Bistums?', answer: 'Bistum Aachen (Bonus: Erzbistum Köln)', exp: 'Odenkirchen gehört zum Bistum Aachen.' },
+          { id: 'q5', type: 'open', title: '5. Welcher Wortlaut steht auf unserem Logo?', text: 'Exakter Text des Logos?', answer: 'ACHTUNG MESSDIENER St. Laurentius Odenkirchen', exp: 'Aufdruck des offiziellen Gruppenlogos.' },
+          { id: 'q6', type: 'open', title: '6. Was wird an Fronleichnam gefeiert?', text: 'Bedeutung von Fronleichnam?', answer: 'Wandlung des Brotes zum Leib Christi / Hochfest des Leibes und Blutes Christi.', exp: 'Feier der dauerhaften Gegenwart Jesu in der Eucharistie.' },
+          { id: 'q7', type: 'open', title: '7. Wie nennen wir unseren Leiterraum auch?', text: 'Name des Leiterraums?', answer: 'Die Burg', exp: 'Die Burg ist der Treffpunkt der Leiter.' },
+          { id: 'q8', type: 'open', title: '8. Wie heißt unsere Kantorin?', text: 'Name der Kantorin?', answer: 'Stephanie Borkenfeld-Müllers', exp: 'Leitet die Kirchenmusik & Gesang.' },
+          { id: 'q9', type: 'open', title: '9. Wie werden die Teigblättchen genannt?', text: 'Name der Brotscheiben in der Messe?', answer: 'Hostien', exp: 'Hostien (lat. Opfergabe) aus ungesäuertem Weizenbrot.' },
+          { id: 'q10', type: 'open', title: '10. Erkennungsmerkmal des hl. St. Laurentius?', text: 'Welchen Gegenstand hält Laurentius in Abbildungen?', answer: 'Ein Rost', exp: 'Erlitt das Märtyrertum auf einem glühenden Eisenrost.' }
+        ],
+        postTaskTitle: "POSTENAUFGABE: MENSCHENPYRAMIDE",
+        postTaskText: "Baut gemeinsam eine stabile Menschenpyramide auf! (0.0 bis 3.0 Punkte).",
+        nextTaskText: "GLÜCKWUNSCH! Ihr habt alle 5 Posten der Schnitzeljagd 2026 erfolgreich absolviert!"
+      }
+    };
+
+    let activeTab = 'p1';
+    let selectedTeamForPosten = {};
+    let html5QrCode = null;
+
+    // Load Data from LocalStorage
+    function loadData() {
+      const stored = localStorage.getItem(DB_KEY);
+      if (stored) {
+        try {
+          appData = JSON.parse(stored);
+        } catch (e) { console.error('Data corrupted, resetting'); }
+      }
+      // Initialize Team selection
+      appData.teams.forEach(t => {
+        if (!appData.scores[t]) appData.scores[t] = {};
+      });
+    }
+
+    function saveData() {
+      localStorage.setItem(DB_KEY, JSON.stringify(appData));
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      activeTab = tabId;
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('border-brand-gold', 'text-brand-gold', 'bg-brand-gold/20');
+        btn.classList.add('border-transparent', 'text-gray-400');
+      });
+      const activeBtn = document.getElementById(`nav-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('border-brand-gold', 'text-brand-gold', 'bg-brand-gold/20');
+        activeBtn.classList.remove('border-transparent', 'text-gray-400');
+      }
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(e => console.log(e));
+      }
+      render();
+    }
+
+    // Render Logic
+    function render() {
+      const container = document.getElementById('app-content');
+      if (!container) return;
+
+      if (activeTab === 'spielleiter') {
+        renderSpielleiter(container);
+      } else if (activeTab === 'sync') {
+        renderSync(container);
+      } else {
+        renderPosten(container, activeTab);
+      }
+    }
+
+    // Render Posten
+    function renderPosten(container, pKey) {
+      const pConfig = POSTEN_DATA[pKey];
+      if (!selectedTeamForPosten[pKey] || !appData.teams.includes(selectedTeamForPosten[pKey])) {
+        selectedTeamForPosten[pKey] = appData.teams[0] || '';
+      }
+      const currentTeam = selectedTeamForPosten[pKey];
+
+      if (!currentTeam) {
+        container.innerHTML = `
+          <div class="glass-panel p-6 rounded-2xl text-center">
+            <i class="fa-solid fa-triangle-exclamation text-brand-gold text-4xl mb-3"></i>
+            <h2 class="text-xl font-bold">Keine Teams vorhanden!</h2>
+            <p class="text-sm text-gray-300 mt-2">Bitte erstelle zuerst Teams im Bereich <strong class="text-brand-gold">Spielleiter</strong>.</p>
+            <button onclick="switchTab('spielleiter')" class="mt-4 px-5 py-2.5 gold-gradient text-brand-dark font-bold rounded-xl">Zum Spielleiter</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Read current scores
+      if (!appData.scores[currentTeam]) appData.scores[currentTeam] = {};
+      if (!appData.scores[currentTeam][pKey]) appData.scores[currentTeam][pKey] = {};
+      const teamScores = appData.scores[currentTeam][pKey];
+
+      let html = `
+        <div class="space-y-6">
+          <!-- Posten Header -->
+          <div class="glass-panel p-5 rounded-2xl border-l-4 border-brand-gold">
+            <h2 class="text-2xl font-black gold-text">${pConfig.title}</h2>
+            <p class="text-xs text-gray-300 mt-1"><i class="fa-solid fa-box text-brand-gold"></i> <strong>Material:</strong> ${pConfig.material}</p>
+          </div>
+
+          <!-- Team Selection Bar -->
+          <div class="bg-brand-green/80 p-3 rounded-2xl border border-brand-gold/30">
+            <label class="text-xs font-bold text-brand-gold uppercase tracking-wider block mb-2"><i class="fa-solid fa-users"></i> Gruppe auswählen:</label>
+            <div class="flex flex-wrap gap-2">
+              ${appData.teams.map(t => `
+                <button onclick="selectTeamForPosten('${pKey}', '${t}')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all ${t === currentTeam ? 'gold-gradient text-brand-dark shadow-lg scale-105' : 'bg-brand-dark/60 text-gray-300 hover:bg-brand-dark'}">
+                  ${t}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+      `;
+
+      // 1. Mitgebrachte Aufgabe
+      if (pConfig.hasPrevTask) {
+        const val = teamScores.prevTask !== undefined ? teamScores.prevTask : 0;
+        html += `
+          <div class="glass-panel p-5 rounded-2xl border-l-4 border-amber-500">
+            <h3 class="font-bold text-amber-400 text-base"><i class="fa-solid fa-truck-ramp-box"></i> ${pConfig.prevTaskTitle}</h3>
+            <p class="text-xs text-gray-300 mt-1">${pConfig.prevTaskDesc}</p>
+            <div class="mt-3 flex items-center gap-2">
+              <span class="text-xs font-semibold text-gray-400">Punkte:</span>
+              <div class="flex gap-1.5 flex-wrap">
+                ${[0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].map(v => `
+                  <button onclick="setScore('${pKey}', 'prevTask',${v})" class="px-3 py-1.5 rounded-lg text-xs font-bold ${val === v ? 'gold-gradient text-brand-dark' : 'bg-brand-dark/80 text-gray-300 hover:bg-brand-dark'}">
+                    ${v.toFixed(1)} Pkt
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. Wissensfragen
+      html += `<div class="space-y-4">`;
+      pConfig.questions.forEach((q, idx) => {
+        const val = teamScores[q.id];
+        html += `
+          <div class="glass-panel p-5 rounded-2xl">
+            <h4 class="font-bold text-sm text-brand-gold mb-2">${q.title}</h4>
+            <p class="text-sm font-medium mb-3 whitespace-pre-line">${q.text || ''}</p>
+        `;
+
+        if (q.type === 'mc') {
+          html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">`;
+          q.options.forEach(opt => {
+            const letter = opt.charAt(0);
+            let btnClass = "option-btn text-left p-2.5 rounded-xl text-xs font-medium bg-brand-dark/50 text-gray-200";
+            if (val === letter) {
+              btnClass += (letter === q.correct) ? " selected-correct" : " selected-wrong";
+            }
+            html += `
+              <button onclick="setMcAnswer('${pKey}', '${q.id}', '${letter}', '${q.correct}')" class="${btnClass}">
+                ${opt}
+              </button>
+            `;
+          });
+          html += `</div>`;
+        } else {
+          // Open Question Buttons
+          const curVal = val !== undefined ? val : null;
+          html += `
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xs text-gray-400">Bewertung:</span>
+              <button onclick="setScore('${pKey}', '${q.id}', 0)" class="px-3 py-1.5 rounded-lg text-xs font-bold ${curVal === 0 ? 'bg-red-600 text-white' : 'bg-brand-dark/80 text-gray-300'}">0 Pkt</button>
+              <button onclick="setScore('${pKey}', '${q.id}', 0.5)" class="px-3 py-1.5 rounded-lg text-xs font-bold ${curVal === 0.5 ? 'bg-amber-500 text-brand-dark' : 'bg-brand-dark/80 text-gray-300'}">0.5 Pkt</button>
+              <button onclick="setScore('${pKey}', '${q.id}', 1.0)" class="px-3 py-1.5 rounded-lg text-xs font-bold ${curVal === 1.0 ? 'bg-emerald-600 text-white' : 'bg-brand-dark/80 text-gray-300'}">1.0 Pkt</button>
+            </div>
+          `;
+        }
+
+        // Answer & Explanation
+        html += `
+            <details class="text-xs bg-brand-dark/40 rounded-xl p-2.5 border border-brand-gold/10">
+              <summary class="cursor-pointer font-bold text-brand-gold/90"><i class="fa-solid fa-key"></i> Lösung & Erklärung einblenden</summary>
+              <div class="mt-2 text-gray-300 space-y-1">
+                ${q.answer ? `<p><strong class="text-emerald-400">Antwort:</strong> ${q.answer}</p>` : ''}
+                ${q.correct ? `<p><strong class="text-emerald-400">Richtige Option:</strong> ${q.correct}</p>` : ''}
+                <p><strong class="text-gray-400">Erklärung:</strong> ${q.exp}</p>
+              </div>
+            </details>
+          </div>
+        `;
+      });
+      html += `</div>`;
+
+      // 3. Postenaufgabe vor Ort
+      const postVal = teamScores.postTask !== undefined ? teamScores.postTask : 0;
+      html += `
+        <div class="glass-panel p-5 rounded-2xl border-l-4 border-emerald-500">
+          <h3 class="font-bold text-emerald-400 text-base"><i class="fa-solid fa-star"></i> ${pConfig.postTaskTitle}</h3>
+          <p class="text-xs text-gray-300 mt-1">${pConfig.postTaskText}</p>
+          <div class="mt-3 flex items-center gap-2">
+            <span class="text-xs font-semibold text-gray-400">Punktevergabe:</span>
+            <div class="flex gap-1.5 flex-wrap">
+              ${[0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0].map(v => `
+                <button onclick="setScore('${pKey}', 'postTask',${v})" class="px-3 py-1.5 rounded-lg text-xs font-bold ${postVal === v ? 'gold-gradient text-brand-dark' : 'bg-brand-dark/80 text-gray-300 hover:bg-brand-dark'}">
+                  ${v.toFixed(1)} Pkt
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 4. Hinweiskasten Wegaufgabe
+      html += `
+        <div class="bg-cyan-950/80 border border-cyan-500/40 p-5 rounded-2xl text-cyan-200">
+          <h4 class="font-bold text-sm text-cyan-300 flex items-center gap-2"><i class="fa-solid fa-circle-info"></i> Hinweiskasten: Aufgabe für den nächsten Posten</h4>
+          <p class="text-xs mt-2 leading-relaxed">${pConfig.nextTaskText}</p>
+        </div>
+      </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // Render Spielleiter
+    function renderSpielleiter(container) {
+      let html = `
+        <div class="space-y-6">
+          <div class="glass-panel p-5 rounded-2xl border-l-4 border-brand-gold flex justify-between items-center flex-wrap gap-4">
+            <div>
+              <h2 class="text-2xl font-black gold-text">Spielleiter – Zentrale</h2>
+              <p class="text-xs text-gray-300 mt-1">Verwaltung aller Teams, Punkte-Auswertung und Gesamt-Rangliste.</p>
+            </div>
+            <button onclick="promptAddTeam()" class="px-4 py-2.5 gold-gradient text-brand-dark font-bold rounded-xl text-xs shadow-lg">
+              <i class="fa-solid fa-plus"></i> Neues Team anlegen
+            </button>
+          </div>
+
+          <!-- Teams Management List -->
+          <div class="glass-panel p-5 rounded-2xl">
+            <h3 class="font-bold text-sm text-brand-gold mb-3"><i class="fa-solid fa-users-gear"></i> Registrierte Teams (${appData.teams.length})</h3>
+            ${appData.teams.length === 0 ? '<p class="text-xs text-gray-400">Keine Teams vorhanden. Lege oben dein erstes Team an!</p>' : ''}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              ${appData.teams.map(t => `
+                <div class="bg-brand-dark/70 p-3 rounded-xl border border-brand-gold/20 flex justify-between items-center">
+                  <span class="font-bold text-sm">${t}</span>
+                  <button onclick="confirmDeleteTeam('${t}')" class="text-red-400 hover:text-red-300 p-2 text-xs" title="Team löschen">
+                    <i class="fa-solid fa-trash-can text-base"></i>
+                  </button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Live Leaderboard -->
+          <div class="glass-panel p-5 rounded-2xl">
+            <h3 class="font-bold text-base text-brand-gold mb-4"><i class="fa-solid fa-trophy text-amber-400"></i> Gesamtwertung / Rangliste</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-brand-gold/20 text-brand-gold uppercase tracking-wider">
+                    <th class="py-2.5 px-2">Rang</th>
+                    <th class="py-2.5 px-2">Team</th>
+                    <th class="py-2.5 px-2 text-center">P1</th>
+                    <th class="py-2.5 px-2 text-center">P2</th>
+                    <th class="py-2.5 px-2 text-center">P3</th>
+                    <th class="py-2.5 px-2 text-center">P4</th>
+                    <th class="py-2.5 px-2 text-center">P5</th>
+                    <th class="py-2.5 px-2 text-right">Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-brand-gold/10">
+      `;
+
+      // Calculate totals
+      const leaderboard = appData.teams.map(team => {
+        let total = 0;
+        const postTotals = {};
+        ['p1', 'p2', 'p3', 'p4', 'p5'].forEach(pKey => {
+          let pSum = 0;
+          const pScores = (appData.scores[team] && appData.scores[team][pKey]) ? appData.scores[team][pKey] : {};
+          Object.keys(pScores).forEach(k => {
+            if (k === 'q1' || k === 'q2' || k === 'q3' || k === 'q4' || k === 'q5' || k === 'q6' || k === 'q7' || k === 'q8' || k === 'q9' || k === 'q10') {
+              // If MC, compare with correct
+              const qConf = POSTEN_DATA[pKey].questions.find(q => q.id === k);
+              if (qConf && qConf.type === 'mc') {
+                if (pScores[k] === qConf.correct) pSum += 1.0;
+              } else if (typeof pScores[k] === 'number') {
+                pSum += pScores[k];
+              }
+            } else if (typeof pScores[k] === 'number') {
+              pSum += pScores[k];
+            }
+          });
+          postTotals[pKey] = pSum;
+          total += pSum;
+        });
+        return { team, total, postTotals };
+      });
+
+      // Sort descending
+      leaderboard.sort((a, b) => b.total - a.total);
+
+      leaderboard.forEach((item, idx) => {
+        let badge = `<span class="font-bold text-gray-400">#${idx + 1}</span>`;
+        if (idx === 0) badge = `<span class="text-amber-400 font-black text-sm"><i class="fa-solid fa-crown"></i> 1</span>`;
+        if (idx === 1) badge = `<span class="text-slate-300 font-bold text-sm"><i class="fa-solid fa-medal"></i> 2</span>`;
+        if (idx === 2) badge = `<span class="text-amber-700 font-bold text-sm"><i class="fa-solid fa-award"></i> 3</span>`;
+
+        html += `
+          <tr class="hover:bg-brand-dark/40">
+            <td class="py-3 px-2">${badge}</td>
+            <td class="py-3 px-2 font-bold text-sm">${item.team}</td>
+            <td class="py-3 px-2 text-center text-gray-300">${item.postTotals.p1.toFixed(1)}</td>
+            <td class="py-3 px-2 text-center text-gray-300">${item.postTotals.p2.toFixed(1)}</td>
+            <td class="py-3 px-2 text-center text-gray-300">${item.postTotals.p3.toFixed(1)}</td>
+            <td class="py-3 px-2 text-center text-gray-300">${item.postTotals.p4.toFixed(1)}</td>
+            <td class="py-3 px-2 text-center text-gray-300">${item.postTotals.p5.toFixed(1)}</td>
+            <td class="py-3 px-2 text-right font-black text-sm text-brand-gold">${item.total.toFixed(1)} Pkt</td>
+          </tr>
+        `;
+      });
+
+      html += `
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+    }
+
+    // Render Sync Center
+    function renderSync(container) {
+      const jsonStr = JSON.stringify(appData);
+      const encodedData = encodeURIComponent(jsonStr);
+      const currentUrl = window.location.origin + window.location.pathname + '?data=' + encodedData;
+
+      let html = `
+        <div class="space-y-6">
+          <div class="glass-panel p-5 rounded-2xl border-l-4 border-cyan-400">
+            <h2 class="text-2xl font-black text-cyan-300">Synchronisations-Zentrale</h2>
+            <p class="text-xs text-cyan-100/80 mt-1">Übertrage eingetragene Punkte ganz ohne Internet zwischen Geräten im Wald.</p>
+          </div>
+
+          <!-- EXPORT SECTION -->
+          <div class="glass-panel p-5 rounded-2xl border border-brand-gold/30">
+            <h3 class="font-bold text-base text-brand-gold mb-2"><i class="fa-solid fa-share-nodes"></i> SCHRITT 1: EXPORT (Daten weitergeben)</h3>
+            <p class="text-xs text-gray-300 mb-4">Zeige diesen QR-Code dem Spielleiter oder sende ihm den Direkt-Link per Nachricht, sobald Empfang da ist.</p>
+
+            <div class="flex flex-col sm:flex-row items-center gap-6 bg-brand-dark/60 p-4 rounded-xl">
+              <div id="qrcode-container" class="bg-white p-3 rounded-xl shadow-lg"></div>
+              <div class="space-y-3 w-full">
+                <button onclick="copySyncLink('${currentUrl}')" class="w-full py-2.5 px-4 bg-brand-accent hover:bg-brand-green text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-link"></i> Link mit allen Punkten kopieren
+                </button>
+                <button onclick="copyRawCode()" class="w-full py-2.5 px-4 bg-brand-dark hover:bg-black text-gray-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-brand-gold/20">
+                  <i class="fa-solid fa-code"></i> Text-Code in Zwischenablage
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- IMPORT SECTION -->
+          <div class="glass-panel p-5 rounded-2xl border border-emerald-500/40">
+            <h3 class="font-bold text-base text-emerald-400 mb-2"><i class="fa-solid fa-file-import"></i> SCHRITT 2: IMPORT (Daten empfangen)</h3>
+            <p class="text-xs text-gray-300 mb-4">Lies die Punkte von den Postenleitern ein. Entweder per Live-Kamera den QR-Code scannen oder Code/Link einfügen.</p>
+
+            <div class="space-y-4">
+              <button onclick="startCameraScan()" class="w-full py-3 gold-gradient text-brand-dark font-black rounded-xl text-xs shadow-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-camera text-base"></i> QR-Code per Kamera scannen
+              </button>
+
+              <div id="qr-reader" class="hidden overflow-hidden rounded-xl border border-brand-gold"></div>
+
+              <div class="space-y-2">
+                <label class="text-xs font-bold text-gray-300">Code oder Link hier manuell einfügen:</label>
+                <textarea id="import-text-input" rows="3" placeholder="Füge hier den kopierten Link oder Text-Code ein..." class="w-full p-3 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold"></textarea>
+                <button onclick="processManualImport()" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 font-bold rounded-xl text-xs text-white">
+                  Punkte aus Text/Link einlesen & zusammenführen
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = html;
+
+      // Render QR Code
+      setTimeout(() => {
+        const qrElem = document.getElementById('qrcode-container');
+        if (qrElem) {
+          qrElem.innerHTML = '';
+          new QRCode(qrElem, {
+            text: jsonStr,
+            width: 160,
+            height: 160,
+            correctLevel: QRCode.CorrectLevel.L
+          });
+        }
+      }, 50);
+    }
+
+    // Actions & State Setters
+    function selectTeamForPosten(pKey, teamName) {
+      selectedTeamForPosten[pKey] = teamName;
+      render();
+    }
+
+    function setScore(pKey, qId, val) {
+      const team = selectedTeamForPosten[pKey];
+      if (!team) return;
+      if (!appData.scores[team]) appData.scores[team] = {};
+      if (!appData.scores[team][pKey]) appData.scores[team][pKey] = {};
+
+      appData.scores[team][pKey][qId] = val;
+      saveData();
+      render();
+    }
+
+    function setMcAnswer(pKey, qId, letter, correctLetter) {
+      const team = selectedTeamForPosten[pKey];
+      if (!team) return;
+      if (!appData.scores[team]) appData.scores[team] = {};
+      if (!appData.scores[team][pKey]) appData.scores[team][pKey] = {};
+
+      appData.scores[team][pKey][qId] = letter;
+      saveData();
+      render();
+    }
+
+    // Team Management
+    function promptAddTeam() {
+      const name = prompt("Name der neuen Gruppe / des Teams:");
+      if (name && name.trim()) {
+        const cleanName = name.trim();
+        if (!appData.teams.includes(cleanName)) {
+          appData.teams.push(cleanName);
+          appData.scores[cleanName] = {};
+          saveData();
+          render();
+        } else {
+          alert("Dieses Team existiert bereits!");
+        }
+      }
+    }
+
+    function confirmDeleteTeam(teamName) {
+      if (confirm(`Möchtest du das Team "${teamName}" wirklich löschen? Alle Punkte gehen verloren.`)) {
+        appData.teams = appData.teams.filter(t => t !== teamName);
+        delete appData.scores[teamName];
+        saveData();
+        render();
+      }
+    }
+
+    // Sync Helper Functions
+    function copySyncLink(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert("Direkt-Link wurde in die Zwischenablage kopiert!");
+      }).catch(() => {
+        alert("Fehler beim Kopieren. Bitte kopiere den Link manuell.");
+      });
+    }
+
+    function copyRawCode() {
+      const str = JSON.stringify(appData);
+      navigator.clipboard.writeText(str).then(() => {
+        alert("Text-Code wurde in die Zwischenablage kopiert!");
+      });
+    }
+
+    function processManualImport() {
+      const input = document.getElementById('import-text-input').value.trim();
+      if (!input) return alert("Bitte füge zuerst einen Code oder Link ein.");
+
+      try {
+        let rawJson = input;
+        if (input.includes('?data=')) {
+          const parts = input.split('?data=');
+          rawJson = decodeURIComponent(parts[1]);
+        }
+        const importedData = JSON.parse(rawJson);
+        mergeData(importedData);
+      } catch (e) {
+        alert("Ungültiger Code oder Link! Bitte überprüfe die Eingabe.");
+      }
+    }
+
+    function mergeData(imported) {
+      if (!imported || !imported.teams || !imported.scores) {
+        return alert("Ungültiges Datenformat!");
+      }
+
+      // Merge Teams
+      imported.teams.forEach(t => {
+        if (!appData.teams.includes(t)) appData.teams.push(t);
+        if (!appData.scores[t]) appData.scores[t] = {};
+      });
+
+      // Merge Scores (overwrite/combine)
+      Object.keys(imported.scores).forEach(team => {
+        if (!appData.scores[team]) appData.scores[team] = {};
+        Object.keys(imported.scores[team]).forEach(pKey => {
+          if (!appData.scores[team][pKey]) appData.scores[team][pKey] = {};
+          Object.assign(appData.scores[team][pKey], imported.scores[team][pKey]);
+        });
+      });
+
+      saveData();
+      alert("Punkte erfolgreich synchronisiert!");
+      switchTab('spielleiter');
+    }
+
+    function startCameraScan() {
+      const readerElem = document.getElementById('qr-reader');
+      readerElem.classList.remove('hidden');
+
+      if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("qr-reader");
+      }
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText) => {
+          html5QrCode.stop().then(() => {
+            readerElem.classList.add('hidden');
+            try {
+              let jsonStr = decodedText;
+              if (decodedText.includes('?data=')) {
+                jsonStr = decodeURIComponent(decodedText.split('?data=')[1]);
+              }
+              const imported = JSON.parse(jsonStr);
+              mergeData(imported);
+            } catch (e) {
+              alert("Gescannter QR-Code enthält ungültige Daten.");
+            }
+          });
+        },
+        () => {}
+      ).catch(err => {
+        alert("Kamera konnte nicht gestartet werden. Bitte erlaube den Kamerazugriff.");
+      });
+    }
+
+    // Auto Import on URL params
+    function checkUrlParamsForData() {
+      const params = new URLSearchParams(window.location.search);
+      const dataParam = params.get('data');
+      if (dataParam) {
+        try {
+          const imported = JSON.parse(decodeURIComponent(dataParam));
+          if (confirm("Punkte aus dem geöffneten Link jetzt importieren?")) {
+            mergeData(imported);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (e) { console.error('Auto import failed'); }
+      }
+    }
+
+    // Init App
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      checkUrlParamsForData();
+      render();
+    });
+  </script>
+</body>
+</html>
