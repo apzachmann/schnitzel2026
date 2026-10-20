@@ -76,34 +76,56 @@
     <div id="app-content"></div>
   </main>
 
+  <!-- Modal für Team-Zusammenfassung -->
+  <div id="merge-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="glass-panel p-6 rounded-2xl max-w-md w-full border border-brand-gold/40 shadow-2xl space-y-4">
+      <h3 class="text-lg font-black gold-text"><i class="fa-solid fa-object-ungroup"></i> Teams zusammenfassen</h3>
+      <p class="text-xs text-gray-300">Wähle die Teams aus, die zusammengelegt werden sollen, und gib den neuen Namen ein:</p>
+      
+      <div>
+        <label class="text-xs font-bold text-brand-gold block mb-1">Neuer Team-Name:</label>
+        <input type="text" id="merge-target-name" placeholder="z. B. Gruppe 1" class="w-full p-2.5 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold">
+      </div>
+
+      <div>
+        <label class="text-xs font-bold text-brand-gold block mb-2">Zu verbindende Teams auswählen:</label>
+        <div id="merge-checkboxes-container" class="space-y-2 max-h-48 overflow-y-auto bg-brand-dark/50 p-3 rounded-xl border border-brand-gold/20">
+          <!-- Dynamisch befüllt -->
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="executeMergeTeams()" class="flex-1 py-2.5 gold-gradient text-brand-dark font-bold rounded-xl text-xs">Zusammenfassen</button>
+        <button onclick="closeMergeModal()" class="px-4 py-2.5 bg-brand-dark hover:bg-black text-gray-300 font-bold rounded-xl text-xs border border-gray-600">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+
   <!-- JavaScript Code -->
   <script>
-    // State Management
     const DB_KEY = 'schnitzeljagd_2026_data';
     let appData = {
-      teams: ['Gruppe Alpha', 'Gruppe Beta', 'Gruppe Gamma'],
-      scores: {} // { teamName: { p1: { prevTask: 0, q1: 1, ..., postTask: 2 }, p2: ... } }
+      teams: ['Gruppe 1', 'Gruppe 2', 'Gruppe 3', 'Gruppe 4'],
+      scores: {}
     };
 
-    // Database Contents
     const POSTEN_DATA = {
       p1: {
         title: "Posten 1 – Logik",
         material: "3 Flaschen mit Maßangabe (300, 400, 500 ml), Messbecher (mind. 1 l), 1,5-l-Wasserflasche (still, voll)",
-        prevTaskText: "Eingabe der mitgebrachten Punkte vom vorherigen Posten (falls vorhanden).",
         hasPrevTask: false,
         questions: [
-          { id: 'q1', type: 'open', title: '1. Blumen für die Mütter', text: 'Rose, Iris und Lilly haben die Blumen für ihre Mütter gekauft: die Rosen, die Iris und die Lilien. „Das ist so toll!“, sagte das Mädchen mit den Rosen. „Wir haben die Rosen, die Iris und die Lilien gekauft, aber keine von uns hat die Blumen gekauft, die wie ihr Name klingen.“ „Du hast ja so recht!“, fügte Lilly hinzu. Welche Blumen hat jedes der Mädchen gekauft?', answer: 'Rose kaufte die Lilien, Lilly kaufte die Iris und Iris kaufte die Rosen.', exp: 'Keines der Mädchen hat die Blumen gekauft, die wie ihr Name klingen. Das Mädchen mit den Rosen ist nicht Rose und nicht Lilly (antwortet). Also hat Iris die Rosen gekauft. Rose bleiben die Lilien und Lilly die Iris.' },
-          { id: 'q2', type: 'open', title: '2. Sie sind kein Ehepaar', text: 'Ein Mann und eine Frau sitzen auf der Bank im Park. Ein anderer Mann fragt: „Seid ihr Mann und Frau?“ Die Frau antwortet: „Wir sind zwar kein Ehepaar, aber meine Mutter hat seine Mutter geboren.“ In welcher Beziehung stehen sie zueinander?', answer: 'Sie sind Tante und Neffe.', exp: 'Die Mutter der Frau hat die Mutter des Mannes zur Welt gebracht. Die beiden Mütter sind Mutter und Tochter. Die Frau und die Mutter des Mannes sind Schwestern. Damit ist die Frau die Tante und er ihr Neffe.' },
-          { id: 'q3', type: 'open', title: '3. Im Obstgarten', text: 'Blattläuse haben einen Obstgarten angegriffen. Jeden Tag wurden doppelt so viele Obstbäume angegriffen wie am Tag zuvor. Nach 6 Tagen war der ganze Obstgarten befallen. Nach wie vielen Tagen wurde der halbe Obstgarten befallen?', answer: 'Nach 5 Tagen.', exp: 'Die Zahl verdoppelt sich jeden Tag. Am 6. Tag war der ganze Garten befallen – am Tag davor (5. Tag) war es also genau die Hälfte.' },
-          { id: 'q4', type: 'open', title: '4. Wer ist der Lehrer?', text: 'Die Berufe von Hans, Peter und Franz sind Arzt, Rechtsanwalt und Lehrer. Der Lehrer ist Einzelkind und verdient am wenigsten. Franz, der die Schwester von Hans geheiratet hat, verdient mehr als der Arzt. Finde heraus, wer der Lehrer ist!', answer: 'Hans ist Arzt, Franz ist Rechtsanwalt und Peter ist Lehrer.', exp: 'Franz hat Hans\' Schwester geheiratet -> Hans ist kein Einzelkind (nicht Lehrer). Franz verdient mehr als der Arzt -> Franz nicht Arzt/Lehrer. Franz = Rechtsanwalt. Hans = Arzt, Peter = Lehrer.' },
-          { id: 'q5', type: 'open', title: '5. Kisten', text: 'Auf 3 Kisten (2 leer, 1 mit Geld) klebt je ein Aufkleber. Genau einer ist wahr:\n1: „Geld ist da.“\n2: „Geld ist nicht hier.“\n3: „Das Geld ist nicht in der ersten Kiste.“\nWelche Kiste muss gewählt werden?', answer: 'Die zweite Kiste.', exp: 'Liegt das Geld in Kiste 2, ist nur Aufkleber 3 wahr (1 und 2 sind falsch). Das erfüllt die Bedingung, dass genau ein Aufkleber wahr ist.' },
+          { id: 'q1', type: 'open', title: '1. Blumen für die Mütter', text: 'Rose, Iris und Lilly haben die Blumen für ihre Mütter gekauft: die Rosen, die Iris und die Lilien. „Das ist so toll!“, sagte das Mädchen mit den Rosen. „Wir haben die Rosen, die Iris und die Lilien gekauft, aber keine von uns hat die Blumen gekauft, die wie ihr Name klingen.“ „Du hast ja so recht!“, fügte Lilly hinzu. Welche Blumen hat jedes der Mädchen gekauft?', answer: 'Rose kaufte die Lilien, Lilly kaufte die Iris und Iris kaufte die Rosen.', exp: 'Keines der Mädchen hat die Blumen gekauft, die wie ihr Name klingen. Das Mädchen mit den Rosen ist nicht Rose und nicht Lilly. Also hat Iris die Rosen gekauft. Rose bleiben die Lilien und Lilly die Iris.' },
+          { id: 'q2', type: 'open', title: '2. Sie sind kein Ehepaar', text: 'Ein Mann und eine Frau sitzen auf der Bank im Park. Ein anderer Mann kommt und fragt: „Seid ihr Mann und Frau?“ Die Frau antwortet: „Wir sind zwar kein Ehepaar, aber meine Mutter hat seine Mutter geboren.“ In welcher Beziehung stehen sie zueinander?', answer: 'Sie sind Tante und Neffe.', exp: 'Die Mutter der Frau hat die Mutter des Mannes zur Welt gebracht. Die Frau und die Mutter des Mannes sind Schwestern. Damit ist die Frau die Tante und er ihr Neffe.' },
+          { id: 'q3', type: 'open', title: '3. Im Obstgarten', text: 'Blattläuse haben einen Obstgarten angegriffen. Jeden Tag wurden doppelt so viele Obstbäume angegriffen wie am Tag zuvor. Nach 6 Tagen war der ganze Obstgarten befallen. Nach wie vielen Tagen wurde der halbe Obstgarten befallen?', answer: 'Nach 5 Tagen.', exp: 'Die Zahl verdoppelt sich jeden Tag. Am 6. Tag war der ganze Garten befallen – am 5. Tag war es also genau die Hälfte.' },
+          { id: 'q4', type: 'open', title: '4. Wer ist der Lehrer?', text: 'Die Berufe von Hans, Peter und Franz sind Arzt, Rechtsanwalt und Lehrer. Der Lehrer ist Einzelkind und verdient am wenigsten. Franz, der die Schwester von Hans geheiratet hat, verdient mehr als der Arzt. Finde heraus, wer der Lehrer ist!', answer: 'Hans ist Arzt, Franz ist Rechtsanwalt und Peter ist Lehrer.', exp: 'Franz hat Hans\' Schwester geheiratet -> Hans ist kein Einzelkind. Franz verdient mehr als der Arzt -> Franz = Rechtsanwalt. Hans = Arzt, Peter = Lehrer.' },
+          { id: 'q5', type: 'open', title: '5. Kisten', text: 'Auf 3 Kisten (2 leer, 1 mit Geld) klebt je ein Aufkleber. Genau einer ist wahr:\n1: „Geld ist da.“\n2: „Geld ist nicht hier.“\n3: „Das Geld ist nicht in der ersten Kiste.“\nWelche Kiste muss gewählt werden?', answer: 'Die zweite Kiste.', exp: 'Liegt das Geld in Kiste 2, ist nur Aufkleber 3 wahr (1 und 2 sind falsch).' },
           { id: 'q6', type: 'open', title: '6. Wie viele Kinder sind es?', text: 'Jedes Kind in einer Familie hat mindestens 3 Brüder und 3 Schwestern. Wie viele Kinder hat diese Familie mindestens?', answer: 'Mindestens 8 Kinder (4 Jungen und 4 Mädchen).', exp: 'Jeder Junge braucht 3 BRÜDER -> mind. 4 Jungen. Jedes Mädchen braucht 3 SCHWESTERN -> mind. 4 Mädchen. Zusammen mind. 8 Kinder.' },
-          { id: 'q7', type: 'open', title: '7. Schwer zu erklären', text: 'Erik hat gestern 500 Euro von seinem Vater bekommen und Dietmar 200 Euro von seinem Vater. Trotzdem haben sie zusammen statt 700 Euro nur 500 Euro mehr als bisher. Wie ist das möglich?', answer: 'Erik ist Dietmars Vater.', exp: 'Dietmar bekommt 200 € von Erik. Das Geld war vorher schon da. Neu sind nur die 500 €, die Erik von seinem Vater bekommen hat.' },
+          { id: 'q7', type: 'open', title: '7. Schwer zu erklären', text: 'Erik hat gestern 500 Euro von seinem Vater bekommen und Dietmar 200 Euro von seinem Vater. Trotzdem haben sie zusammen statt 700 Euro nur 500 Euro mehr als bisher. Wie ist das möglich?', answer: 'Erik ist Dietmars Vater.', exp: 'Dietmar bekommt 200 € von Erik. Das Geld war vorher schon da. Neu sind nur die 500 €, die Erik bekommen hat.' },
           { id: 'q8', type: 'open', title: '8. Der Geburtstag', text: '„Vorgestern war ich noch 25 Jahre alt, aber nächstes Jahr werde ich 28.“ Das ist nur an einem Tag im Jahr möglich. Wann ist der Mann geboren?', answer: 'Geburtstag: 31. Dezember. Gespräch findet am 1. Januar statt.', exp: 'Am 30.12. war er 25. Am 31.12. wird er 26. In diesem Jahr am 31.12. wird er 27, nächstes Jahr 28.' }
         ],
         postTaskTitle: "POSTENAUFGABE: 400 ML ABMESSEN",
-        postTaskText: "Die Kinder erhalten 500ml und 300ml Gefäße & 1l Wasser. Genau 400ml abmessen ohne zu verschütten! (Maximal 3,0 Punkte).",
+        postTaskText: "Die Kinder erhalten 500ml und 300ml Gefäße & 1l Wasser. Genau 400ml abmessen ohne zu verschütten! (0.0 bis 3.0 Punkte).",
         nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Beim nächsten Posten geht es um Natur und Wald. Übt Tiergeräusche (mindestens 5) und macht sie dort vor."
       },
       p2: {
@@ -118,14 +140,14 @@
           { id: 'q3', type: 'mc', title: '3. Wie tief taucht ein Pottwal normalerweise?', options: ['A) 500 m', 'B) 1000 m', 'C) 1500 m', 'D) 2000 m'], correct: 'B', exp: 'Pottwale tauchen auf der Jagd nach Tintenfischen ca. 400 bis 1000 Meter tief.' },
           { id: 'q4', type: 'mc', title: '4. Wie heißt das ausgedehnte Wurzelgeflecht der Pilze?', options: ['A) Chlorophyll', 'B) Myzel', 'C) Pfifferling', 'D) Ribosom'], correct: 'B', exp: 'Das Myzel ist das weit verzweigte Fadengeflecht im Boden.' },
           { id: 'q5', type: 'mc', title: '5. Hauptgrund für das Absterben der Kiefern-Wald-Monokulturen in Deutschland?', options: ['A) Borkenkäfer und Trockenheit', 'B) Wurzelfäule', 'C) Eichenprozessionsspinner', 'D) zu wenig CO₂ in der Luft'], correct: 'A', exp: 'Trockenheit schwächt die Bäume, Borkenkäfer haben leichtes Spiel.' },
-          { id: 'q6', type: 'mc', title: '6. Was ist die größte Wüste der Welt?', options: ['A) Gobi', 'B) Sahara', 'C) Antarktis', 'D) Atacama'], correct: 'C', exp: 'Die Antarktis ist mit 14 Mio. km² die größte (Kälte-)Wüste der Erde.' },
-          { id: 'q7', type: 'mc', title: '7. Warum verfärbt sich das Laub der Bäume?', options: ['A) Licht lässt Blätter weniger grün erscheinen', 'B) Das grüne Chlorophyll wird in den Stamm eingelagert', 'C) Es bilden sich vermehrt gelbe/rote Farbstoffe', 'D) Menschen haben Bäume so gezüchtet'], correct: 'B', exp: 'Chlorophyll wird entzogen und eingelagert, andere Farbstoffe kommen zum Vorschein.' },
+          { id: 'q6', type: 'mc', title: '6. Was ist die größte Wüste der Welt?', options: ['A) Gobi', 'B) Sahara', 'C) Antarktis', 'D) Atacama'], correct: 'C', exp: 'Die Antarktis ist mit 14 Mio. km² die größte Wüste der Erde.' },
+          { id: 'q7', type: 'mc', title: '7. Warum verfärbt sich das Laub der Bäume?', options: ['A) Licht lässt Blätter weniger grün erscheinen', 'B) Das grüne Chlorophyll wird in den Stamm eingelagert', 'C) Es bilden sich vermehrt gelbe/rote Farbstoffe', 'D) Menschen haben Bäume so gezüchtet'], correct: 'B', exp: 'Chlorophyll wird entzogen, andere Farbstoffe kommen zum Vorschein.' },
           { id: 'q8', type: 'mc', title: '8. Warum pflanzten die Preußen im 19. Jahrhundert Fichten an?', options: ['A) Resistenter gegen Eiszeit', 'B) Pilzflechte raffte Eichen/Buchen dahin', 'C) Fichten wachsen gerade und schnell', 'D) Ästhetisch ansprechender'], correct: 'C', exp: 'Fichten liefern schnell viel gerade gewachsenes Bauholz.' },
           { id: 'q9', type: 'mc', title: '9. Welches dieser Tiere ist eine invasive Art?', options: ['A) Rothirsch', 'B) Wanderfalke', 'C) Kohlmeise', 'D) Waschbär'], correct: 'D', exp: 'Der Waschbär stammt aus Nordamerika und verdrängt heimische Arten.' },
           { id: 'q10', type: 'mc', title: '10. Bei der Photosynthese wird was umgewandelt?', options: ['A) Licht + CO₂ + Wasser → Sauerstoff + Glucose', 'B) Licht + CO₂ → Sauerstoff', 'C) Licht + CO₂ → Sauerstoff + Chlorophyll', 'D) Licht + CO₂ + Chlorophyll → Sauerstoff + Wasser'], correct: 'A', exp: 'Pflanzen wandeln CO2, Wasser und Licht in Traubenzucker und Sauerstoff um.' }
         ],
         postTaskTitle: "POSTENAUFGABE: TIERGERÄUSCHE RATEN",
-        postTaskText: "Spiele die 15 Tiergeräusche aus der Cloud ab. Bewertet wird die Anzahl der richtig erratenen Tiere (0.0 bis 3.0 Punkte).",
+        postTaskText: "Spiele die 15 Tiergeräusche ab. Bewertet wird die Anzahl der richtig erratenen Tiere (0.0 bis 3.0 Punkte).",
         nextTaskText: "AUFGABE FÜR DEN NÄCHSTEN POSTEN: Ihr bekommt ein rohes Ei und transportiert es zum nächsten Posten, ohne dass es beschädigt wird."
       },
       p3: {
@@ -133,7 +155,7 @@
         material: "1 Esslöffel, etwas Flatterband",
         hasPrevTask: true,
         prevTaskTitle: "Mitgebrachte Aufgabe: Rohes Ei transportiert",
-        prevTaskDesc: "Ist das Ei heile am Posten angekommen? (Bewertung 0.0 bis 3.0 Punkte).",
+        prevTaskDesc: "Ist das Ei heile am Posten angekommen? (0.0 bis 3.0 Punkte).",
         questions: [
           { id: 'q1', type: 'mc', title: '1. Ziel des „Manhattan Project“ 1942?', options: ['A) Bekämpfung der Slums', 'B) Bau einer Weltraumrakete', 'C) Bau der Atombombe'], correct: 'C', exp: 'Wissenschaftler arbeiteten unter J. Robert Oppenheimer an der ersten Atombombe.' },
           { id: 'q2', type: 'mc', title: '2. Wer erfand 1879 die erste brauchbare elektrische Lampe?', options: ['A) George Eastman', 'B) Thomas Alva Edison', 'C) James Watt'], correct: 'B', exp: 'Edisons Glühlampe brannte erstmals lange genug für den Alltagsgebrauch.' },
@@ -162,7 +184,7 @@
           { id: 'q3', type: 'mc', title: '3. Welche beiden Flüsse treffen in Koblenz aufeinander?', options: ['A) Main und Donau', 'B) Spree und Neiße', 'C) Oder und Elbe', 'D) Rhein und Mosel'], correct: 'D', exp: 'Am Deutschen Eck mündet die Mosel in den Rhein.' },
           { id: 'q4', type: 'mc', title: '4. Ist Australien ein Kontinent oder ein Staat?', options: ['A) Kontinent', 'B) Staat', 'C) Beides', 'D) Keines'], correct: 'C', exp: 'Australien ist sowohl ein Staat als auch ein Kontinent.' },
           { id: 'q5', type: 'mc', title: '5. Warum geht die Sonne am Pol im Sommer nie unter?', options: ['A) Kälte verzerrt Horizont', 'B) Weil die Erde leicht geneigt ist', 'C) Gibt keinen Polartag', 'D) Ozonloch lässt Sonne durch'], correct: 'B', exp: 'Die Erdachse ist um 23,4° geneigt.' },
-          { id: 'q6', type: 'mc', title: '6. Meerenge zwischen Großbritannien und Frankreich?', options: ['A) Hosenkanal', 'B) Ärmelkanal', 'C) Sockenkanal', 'D) Kapuzenkanal'], correct: 'B', exp: 'Der Ärmelkanal (La Manche) trennt Großbritannien von Frankreich.' },
+          { id: 'q6', type: 'mc', title: '6. Meerenge zwischen Großbritannien und Frankreich?', options: ['A) Hosenkanal', 'B) Ärmelkanal', 'C) Sockenkanal', 'D) Kapuzenkanal'], correct: 'B', exp: 'Der Ärmelkanal trennt Großbritannien von Frankreich.' },
           { id: 'q7', type: 'mc', title: '7. In welcher Stadt steht das höchste Gebäude der Welt?', options: ['A) Abu Dhabi', 'B) Paris', 'C) New York', 'D) Dubai'], correct: 'D', exp: 'Der Burj Khalifa steht in Dubai (828 Meter).' },
           { id: 'q8', type: 'open', title: '8. Zählt mindestens 8 Bundesländer auf!', text: 'Nenne mindestens 8 deutsche Bundesländer.', answer: '16 Bundesländer zur Auswahl (z.B. NRW, Bayern, Hessen, Berlin...).', exp: '8 ordnungsgemäß genannte Bundesländer ergeben die vollen Punkte.' },
           { id: 'q9', type: 'mc', title: '9. Welches Land liegt zwischen Österreich und der Schweiz?', options: ['A) Liechtenstein', 'B) Andorra', 'C) Angola', 'D) Italien'], correct: 'A', exp: 'Liechtenstein ist das Fürstentum zwischen Österreich und der Schweiz.' },
@@ -187,7 +209,7 @@
           { id: 'q6', type: 'open', title: '6. Was wird an Fronleichnam gefeiert?', text: 'Bedeutung von Fronleichnam?', answer: 'Wandlung des Brotes zum Leib Christi / Hochfest des Leibes und Blutes Christi.', exp: 'Feier der dauerhaften Gegenwart Jesu in der Eucharistie.' },
           { id: 'q7', type: 'open', title: '7. Wie nennen wir unseren Leiterraum auch?', text: 'Name des Leiterraums?', answer: 'Die Burg', exp: 'Die Burg ist der Treffpunkt der Leiter.' },
           { id: 'q8', type: 'open', title: '8. Wie heißt unsere Kantorin?', text: 'Name der Kantorin?', answer: 'Stephanie Borkenfeld-Müllers', exp: 'Leitet die Kirchenmusik & Gesang.' },
-          { id: 'q9', type: 'open', title: '9. Wie werden die Teigblättchen genannt?', text: 'Name der Brotscheiben in der Messe?', answer: 'Hostien', exp: 'Hostien (lat. Opfergabe) aus ungesäuertem Weizenbrot.' },
+          { id: 'q9', type: 'open', title: '9. Wie werden die Teigblättchen genannt?', text: 'Name der Brotscheiben in der Messe?', answer: 'Hostien', exp: 'Hostien aus ungesäuertem Weizenbrot.' },
           { id: 'q10', type: 'open', title: '10. Erkennungsmerkmal des hl. St. Laurentius?', text: 'Welchen Gegenstand hält Laurentius in Abbildungen?', answer: 'Ein Rost', exp: 'Erlitt das Märtyrertum auf einem glühenden Eisenrost.' }
         ],
         postTaskTitle: "POSTENAUFGABE: MENSCHENPYRAMIDE",
@@ -200,25 +222,18 @@
     let selectedTeamForPosten = {};
     let html5QrCode = null;
 
-    // Load Data from LocalStorage
     function loadData() {
       const stored = localStorage.getItem(DB_KEY);
       if (stored) {
-        try {
-          appData = JSON.parse(stored);
-        } catch (e) { console.error('Data corrupted, resetting'); }
+        try { appData = JSON.parse(stored); } catch (e) {}
       }
-      // Initialize Team selection
-      appData.teams.forEach(t => {
-        if (!appData.scores[t]) appData.scores[t] = {};
-      });
+      appData.teams.forEach(t => { if (!appData.scores[t]) appData.scores[t] = {}; });
     }
 
     function saveData() {
       localStorage.setItem(DB_KEY, JSON.stringify(appData));
     }
 
-    // Switch Tabs
     function switchTab(tabId) {
       activeTab = tabId;
       document.querySelectorAll('.nav-tab').forEach(btn => {
@@ -236,7 +251,6 @@
       render();
     }
 
-    // Render Logic
     function render() {
       const container = document.getElementById('app-content');
       if (!container) return;
@@ -250,7 +264,6 @@
       }
     }
 
-    // Render Posten
     function renderPosten(container, pKey) {
       const pConfig = POSTEN_DATA[pKey];
       if (!selectedTeamForPosten[pKey] || !appData.teams.includes(selectedTeamForPosten[pKey])) {
@@ -270,20 +283,17 @@
         return;
       }
 
-      // Read current scores
       if (!appData.scores[currentTeam]) appData.scores[currentTeam] = {};
       if (!appData.scores[currentTeam][pKey]) appData.scores[currentTeam][pKey] = {};
       const teamScores = appData.scores[currentTeam][pKey];
 
       let html = `
         <div class="space-y-6">
-          <!-- Posten Header -->
           <div class="glass-panel p-5 rounded-2xl border-l-4 border-brand-gold">
             <h2 class="text-2xl font-black gold-text">${pConfig.title}</h2>
             <p class="text-xs text-gray-300 mt-1"><i class="fa-solid fa-box text-brand-gold"></i> <strong>Material:</strong> ${pConfig.material}</p>
           </div>
 
-          <!-- Team Selection Bar -->
           <div class="bg-brand-green/80 p-3 rounded-2xl border border-brand-gold/30">
             <label class="text-xs font-bold text-brand-gold uppercase tracking-wider block mb-2"><i class="fa-solid fa-users"></i> Gruppe auswählen:</label>
             <div class="flex flex-wrap gap-2">
@@ -296,7 +306,6 @@
           </div>
       `;
 
-      // 1. Mitgebrachte Aufgabe
       if (pConfig.hasPrevTask) {
         const val = teamScores.prevTask !== undefined ? teamScores.prevTask : 0;
         html += `
@@ -317,9 +326,8 @@
         `;
       }
 
-      // 2. Wissensfragen
       html += `<div class="space-y-4">`;
-      pConfig.questions.forEach((q, idx) => {
+      pConfig.questions.forEach((q) => {
         const val = teamScores[q.id];
         html += `
           <div class="glass-panel p-5 rounded-2xl">
@@ -343,7 +351,6 @@
           });
           html += `</div>`;
         } else {
-          // Open Question Buttons
           const curVal = val !== undefined ? val : null;
           html += `
             <div class="flex items-center gap-2 mb-3">
@@ -355,7 +362,6 @@
           `;
         }
 
-        // Answer & Explanation
         html += `
             <details class="text-xs bg-brand-dark/40 rounded-xl p-2.5 border border-brand-gold/10">
               <summary class="cursor-pointer font-bold text-brand-gold/90"><i class="fa-solid fa-key"></i> Lösung & Erklärung einblenden</summary>
@@ -370,7 +376,6 @@
       });
       html += `</div>`;
 
-      // 3. Postenaufgabe vor Ort
       const postVal = teamScores.postTask !== undefined ? teamScores.postTask : 0;
       html += `
         <div class="glass-panel p-5 rounded-2xl border-l-4 border-emerald-500">
@@ -387,10 +392,7 @@
             </div>
           </div>
         </div>
-      `;
 
-      // 4. Hinweiskasten Wegaufgabe
-      html += `
         <div class="bg-cyan-950/80 border border-cyan-500/40 p-5 rounded-2xl text-cyan-200">
           <h4 class="font-bold text-sm text-cyan-300 flex items-center gap-2"><i class="fa-solid fa-circle-info"></i> Hinweiskasten: Aufgabe für den nächsten Posten</h4>
           <p class="text-xs mt-2 leading-relaxed">${pConfig.nextTaskText}</p>
@@ -401,7 +403,6 @@
       container.innerHTML = html;
     }
 
-    // Render Spielleiter
     function renderSpielleiter(container) {
       let html = `
         <div class="space-y-6">
@@ -410,15 +411,19 @@
               <h2 class="text-2xl font-black gold-text">Spielleiter – Zentrale</h2>
               <p class="text-xs text-gray-300 mt-1">Verwaltung aller Teams, Punkte-Auswertung und Gesamt-Rangliste.</p>
             </div>
-            <button onclick="promptAddTeam()" class="px-4 py-2.5 gold-gradient text-brand-dark font-bold rounded-xl text-xs shadow-lg">
-              <i class="fa-solid fa-plus"></i> Neues Team anlegen
-            </button>
+            <div class="flex gap-2">
+              <button onclick="openMergeModal()" class="px-3 py-2.5 bg-brand-accent hover:bg-brand-green text-white font-bold rounded-xl text-xs shadow-lg">
+                <i class="fa-solid fa-object-ungroup"></i> Teams zusammenfassen
+              </button>
+              <button onclick="promptAddTeam()" class="px-4 py-2.5 gold-gradient text-brand-dark font-bold rounded-xl text-xs shadow-lg">
+                <i class="fa-solid fa-plus"></i> Neues Team anlegen
+              </button>
+            </div>
           </div>
 
-          <!-- Teams Management List -->
           <div class="glass-panel p-5 rounded-2xl">
             <h3 class="font-bold text-sm text-brand-gold mb-3"><i class="fa-solid fa-users-gear"></i> Registrierte Teams (${appData.teams.length})</h3>
-            ${appData.teams.length === 0 ? '<p class="text-xs text-gray-400">Keine Teams vorhanden. Lege oben dein erstes Team an!</p>' : ''}
+            ${appData.teams.length === 0 ? '<p class="text-xs text-gray-400">Keine Teams vorhanden.</p>' : ''}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               ${appData.teams.map(t => `
                 <div class="bg-brand-dark/70 p-3 rounded-xl border border-brand-gold/20 flex justify-between items-center">
@@ -431,7 +436,6 @@
             </div>
           </div>
 
-          <!-- Live Leaderboard -->
           <div class="glass-panel p-5 rounded-2xl">
             <h3 class="font-bold text-base text-brand-gold mb-4"><i class="fa-solid fa-trophy text-amber-400"></i> Gesamtwertung / Rangliste</h3>
             <div class="overflow-x-auto">
@@ -451,7 +455,6 @@
                 <tbody class="divide-y divide-brand-gold/10">
       `;
 
-      // Calculate totals
       const leaderboard = appData.teams.map(team => {
         let total = 0;
         const postTotals = {};
@@ -459,8 +462,7 @@
           let pSum = 0;
           const pScores = (appData.scores[team] && appData.scores[team][pKey]) ? appData.scores[team][pKey] : {};
           Object.keys(pScores).forEach(k => {
-            if (k === 'q1' || k === 'q2' || k === 'q3' || k === 'q4' || k === 'q5' || k === 'q6' || k === 'q7' || k === 'q8' || k === 'q9' || k === 'q10') {
-              // If MC, compare with correct
+            if (k.startsWith('q')) {
               const qConf = POSTEN_DATA[pKey].questions.find(q => q.id === k);
               if (qConf && qConf.type === 'mc') {
                 if (pScores[k] === qConf.correct) pSum += 1.0;
@@ -477,7 +479,6 @@
         return { team, total, postTotals };
       });
 
-      // Sort descending
       leaderboard.sort((a, b) => b.total - a.total);
 
       leaderboard.forEach((item, idx) => {
@@ -511,7 +512,6 @@
       container.innerHTML = html;
     }
 
-    // Render Sync Center
     function renderSync(container) {
       const jsonStr = JSON.stringify(appData);
       const encodedData = encodeURIComponent(jsonStr);
@@ -521,19 +521,18 @@
         <div class="space-y-6">
           <div class="glass-panel p-5 rounded-2xl border-l-4 border-cyan-400">
             <h2 class="text-2xl font-black text-cyan-300">Synchronisations-Zentrale</h2>
-            <p class="text-xs text-cyan-100/80 mt-1">Übertrage eingetragene Punkte ganz ohne Internet zwischen Geräten im Wald.</p>
+            <p class="text-xs text-cyan-100/80 mt-1">Übertrage Punkte ganz ohne Internet zwischen Geräten im Wald.</p>
           </div>
 
-          <!-- EXPORT SECTION -->
           <div class="glass-panel p-5 rounded-2xl border border-brand-gold/30">
             <h3 class="font-bold text-base text-brand-gold mb-2"><i class="fa-solid fa-share-nodes"></i> SCHRITT 1: EXPORT (Daten weitergeben)</h3>
-            <p class="text-xs text-gray-300 mb-4">Zeige diesen QR-Code dem Spielleiter oder sende ihm den Direkt-Link per Nachricht, sobald Empfang da ist.</p>
+            <p class="text-xs text-gray-300 mb-4">Zeige diesen QR-Code dem Spielleiter oder sende den Link per Messenger.</p>
 
             <div class="flex flex-col sm:flex-row items-center gap-6 bg-brand-dark/60 p-4 rounded-xl">
               <div id="qrcode-container" class="bg-white p-3 rounded-xl shadow-lg"></div>
               <div class="space-y-3 w-full">
                 <button onclick="copySyncLink('${currentUrl}')" class="w-full py-2.5 px-4 bg-brand-accent hover:bg-brand-green text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-link"></i> Link mit allen Punkten kopieren
+                  <i class="fa-solid fa-link"></i> Link mit Punkten kopieren
                 </button>
                 <button onclick="copyRawCode()" class="w-full py-2.5 px-4 bg-brand-dark hover:bg-black text-gray-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-brand-gold/20">
                   <i class="fa-solid fa-code"></i> Text-Code in Zwischenablage
@@ -542,10 +541,9 @@
             </div>
           </div>
 
-          <!-- IMPORT SECTION -->
           <div class="glass-panel p-5 rounded-2xl border border-emerald-500/40">
             <h3 class="font-bold text-base text-emerald-400 mb-2"><i class="fa-solid fa-file-import"></i> SCHRITT 2: IMPORT (Daten empfangen)</h3>
-            <p class="text-xs text-gray-300 mb-4">Lies die Punkte von den Postenleitern ein. Entweder per Live-Kamera den QR-Code scannen oder Code/Link einfügen.</p>
+            <p class="text-xs text-gray-300 mb-4">Lies die Punkte per Kamera-Scanner ein oder füge den Link ein.</p>
 
             <div class="space-y-4">
               <button onclick="startCameraScan()" class="w-full py-3 gold-gradient text-brand-dark font-black rounded-xl text-xs shadow-lg flex items-center justify-center gap-2">
@@ -555,10 +553,10 @@
               <div id="qr-reader" class="hidden overflow-hidden rounded-xl border border-brand-gold"></div>
 
               <div class="space-y-2">
-                <label class="text-xs font-bold text-gray-300">Code oder Link hier manuell einfügen:</label>
-                <textarea id="import-text-input" rows="3" placeholder="Füge hier den kopierten Link oder Text-Code ein..." class="w-full p-3 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold"></textarea>
+                <label class="text-xs font-bold text-gray-300">Code oder Link hier einfügen:</label>
+                <textarea id="import-text-input" rows="3" placeholder="Füge hier den Link oder Text-Code ein..." class="w-full p-3 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold"></textarea>
                 <button onclick="processManualImport()" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 font-bold rounded-xl text-xs text-white">
-                  Punkte aus Text/Link einlesen & zusammenführen
+                  Punkte einlesen & zusammenführen
                 </button>
               </div>
             </div>
@@ -568,7 +566,6 @@
 
       container.innerHTML = html;
 
-      // Render QR Code
       setTimeout(() => {
         const qrElem = document.getElementById('qrcode-container');
         if (qrElem) {
@@ -583,7 +580,6 @@
       }, 50);
     }
 
-    // Actions & State Setters
     function selectTeamForPosten(pKey, teamName) {
       selectedTeamForPosten[pKey] = teamName;
       render();
@@ -611,9 +607,8 @@
       render();
     }
 
-    // Team Management
     function promptAddTeam() {
-      const name = prompt("Name der neuen Gruppe / des Teams:");
+      const name = prompt("Name der neuen Gruppe:");
       if (name && name.trim()) {
         const cleanName = name.trim();
         if (!appData.teams.includes(cleanName)) {
@@ -628,7 +623,7 @@
     }
 
     function confirmDeleteTeam(teamName) {
-      if (confirm(`Möchtest du das Team "${teamName}" wirklich löschen? Alle Punkte gehen verloren.`)) {
+      if (confirm(`Möchtest du das Team "${teamName}" wirklich löschen?`)) {
         appData.teams = appData.teams.filter(t => t !== teamName);
         delete appData.scores[teamName];
         saveData();
@@ -636,19 +631,78 @@
       }
     }
 
-    // Sync Helper Functions
+    // Modal-Funktionen für Teams zusammenfassen
+    function openMergeModal() {
+      if (appData.teams.length < 2) {
+        return alert("Es sind nicht genügend Teams zum Zusammenfassen vorhanden.");
+      }
+      document.getElementById('merge-target-name').value = '';
+      const container = document.getElementById('merge-checkboxes-container');
+      container.innerHTML = appData.teams.map(t => `
+        <label class="flex items-center gap-3 text-xs text-gray-200 cursor-pointer p-1 hover:bg-brand-dark/40 rounded">
+          <input type="checkbox" name="merge-team-cb" value="${t}" class="w-4 h-4 accent-brand-gold rounded">
+          <span class="font-medium">${t}</span>
+        </label>
+      `).join('');
+      document.getElementById('merge-modal').classList.remove('hidden');
+    }
+
+    function closeMergeModal() {
+      document.getElementById('merge-modal').classList.add('hidden');
+    }
+
+    function executeMergeTeams() {
+      const targetName = document.getElementById('merge-target-name').value.trim();
+      if (!targetName) {
+        return alert("Bitte gib einen Namen für das Ziel-Team ein.");
+      }
+
+      const checkboxes = document.querySelectorAll('input[name="merge-team-cb"]:checked');
+      const teamsToMerge = Array.from(checkboxes).map(cb => cb.value);
+
+      if (teamsToMerge.length === 0) {
+        return alert("Bitte wähle mindestens ein Team zum Zusammenfassen aus.");
+      }
+
+      if (!appData.teams.includes(targetName)) {
+        appData.teams.push(targetName);
+      }
+      if (!appData.scores[targetName]) {
+        appData.scores[targetName] = {};
+      }
+
+      teamsToMerge.forEach(srcTeam => {
+        if (srcTeam === targetName) return;
+        if (appData.scores[srcTeam]) {
+          Object.keys(appData.scores[srcTeam]).forEach(pKey => {
+            if (!appData.scores[targetName][pKey]) {
+              appData.scores[targetName][pKey] = {};
+            }
+            Object.assign(appData.scores[targetName][pKey], appData.scores[srcTeam][pKey]);
+          });
+        }
+        appData.teams = appData.teams.filter(t => t !== srcTeam);
+        delete appData.scores[srcTeam];
+      });
+
+      saveData();
+      closeMergeModal();
+      alert(`Teams erfolgreich unter "${targetName}" zusammengefasst!`);
+      render();
+    }
+
     function copySyncLink(url) {
       navigator.clipboard.writeText(url).then(() => {
-        alert("Direkt-Link wurde in die Zwischenablage kopiert!");
+        alert("Direkt-Link in Zwischenablage kopiert!");
       }).catch(() => {
-        alert("Fehler beim Kopieren. Bitte kopiere den Link manuell.");
+        alert("Fehler beim Kopieren.");
       });
     }
 
     function copyRawCode() {
       const str = JSON.stringify(appData);
       navigator.clipboard.writeText(str).then(() => {
-        alert("Text-Code wurde in die Zwischenablage kopiert!");
+        alert("Text-Code in Zwischenablage kopiert!");
       });
     }
 
@@ -659,28 +713,23 @@
       try {
         let rawJson = input;
         if (input.includes('?data=')) {
-          const parts = input.split('?data=');
-          rawJson = decodeURIComponent(parts[1]);
+          rawJson = decodeURIComponent(input.split('?data=')[1]);
         }
         const importedData = JSON.parse(rawJson);
         mergeData(importedData);
       } catch (e) {
-        alert("Ungültiger Code oder Link! Bitte überprüfe die Eingabe.");
+        alert("Ungültiger Code oder Link!");
       }
     }
 
     function mergeData(imported) {
-      if (!imported || !imported.teams || !imported.scores) {
-        return alert("Ungültiges Datenformat!");
-      }
+      if (!imported || !imported.teams || !imported.scores) return alert("Ungültiges Datenformat!");
 
-      // Merge Teams
       imported.teams.forEach(t => {
         if (!appData.teams.includes(t)) appData.teams.push(t);
         if (!appData.scores[t]) appData.scores[t] = {};
       });
 
-      // Merge Scores (overwrite/combine)
       Object.keys(imported.scores).forEach(team => {
         if (!appData.scores[team]) appData.scores[team] = {};
         Object.keys(imported.scores[team]).forEach(pKey => {
@@ -713,35 +762,32 @@
               if (decodedText.includes('?data=')) {
                 jsonStr = decodeURIComponent(decodedText.split('?data=')[1]);
               }
-              const imported = JSON.parse(jsonStr);
-              mergeData(imported);
+              mergeData(JSON.parse(jsonStr));
             } catch (e) {
-              alert("Gescannter QR-Code enthält ungültige Daten.");
+              alert("Ungültige QR-Code Daten.");
             }
           });
         },
         () => {}
       ).catch(err => {
-        alert("Kamera konnte nicht gestartet werden. Bitte erlaube den Kamerazugriff.");
+        alert("Kamera konnte nicht gestartet werden.");
       });
     }
 
-    // Auto Import on URL params
     function checkUrlParamsForData() {
       const params = new URLSearchParams(window.location.search);
       const dataParam = params.get('data');
       if (dataParam) {
         try {
           const imported = JSON.parse(decodeURIComponent(dataParam));
-          if (confirm("Punkte aus dem geöffneten Link jetzt importieren?")) {
+          if (confirm("Punkte aus dem Link importieren?")) {
             mergeData(imported);
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        } catch (e) { console.error('Auto import failed'); }
+        } catch (e) {}
       }
     }
 
-    // Init App
     window.addEventListener('DOMContentLoaded', () => {
       loadData();
       checkUrlParamsForData();
