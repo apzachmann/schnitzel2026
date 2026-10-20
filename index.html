@@ -8,10 +8,6 @@
   <!-- Tailwind CSS & FontAwesome Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- QR Code Libraries (Offline Support & Camera Scan) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <script>
     tailwind.config = {
@@ -54,7 +50,7 @@
           <p class="text-xs text-brand-light/70">Messdiener St. Laurentius Odenkirchen</p>
         </div>
       </div>
-      <div id="sync-status-badge" class="bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
+      <div class="bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Offline Bereit
       </div>
     </div>
@@ -220,7 +216,6 @@
 
     let activeTab = 'p1';
     let selectedTeamForPosten = {};
-    let html5QrCode = null;
 
     function loadData() {
       const stored = localStorage.getItem(DB_KEY);
@@ -244,9 +239,6 @@
       if (activeBtn) {
         activeBtn.classList.add('border-brand-gold', 'text-brand-gold', 'bg-brand-gold/20');
         activeBtn.classList.remove('border-transparent', 'text-gray-400');
-      }
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(e => console.log(e));
       }
       render();
     }
@@ -521,63 +513,38 @@
         <div class="space-y-6">
           <div class="glass-panel p-5 rounded-2xl border-l-4 border-cyan-400">
             <h2 class="text-2xl font-black text-cyan-300">Synchronisations-Zentrale</h2>
-            <p class="text-xs text-cyan-100/80 mt-1">Übertrage Punkte ganz ohne Internet zwischen Geräten im Wald.</p>
+            <p class="text-xs text-cyan-100/80 mt-1">Übertrage Punkte ganz ohne Internet über Link-Teilen oder Text-Codes.</p>
           </div>
 
           <div class="glass-panel p-5 rounded-2xl border border-brand-gold/30">
             <h3 class="font-bold text-base text-brand-gold mb-2"><i class="fa-solid fa-share-nodes"></i> SCHRITT 1: EXPORT (Daten weitergeben)</h3>
-            <p class="text-xs text-gray-300 mb-4">Zeige diesen QR-Code dem Spielleiter oder sende den Link per Messenger.</p>
+            <p class="text-xs text-gray-300 mb-4">Kopiere den Direkt-Link oder den Text-Code und sende ihn per WhatsApp, Signal oder E-Mail an den Spielleiter.</p>
 
-            <div class="flex flex-col sm:flex-row items-center gap-6 bg-brand-dark/60 p-4 rounded-xl">
-              <div id="qrcode-container" class="bg-white p-3 rounded-xl shadow-lg"></div>
-              <div class="space-y-3 w-full">
-                <button onclick="copySyncLink('${currentUrl}')" class="w-full py-2.5 px-4 bg-brand-accent hover:bg-brand-green text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-link"></i> Link mit Punkten kopieren
-                </button>
-                <button onclick="copyRawCode()" class="w-full py-2.5 px-4 bg-brand-dark hover:bg-black text-gray-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-brand-gold/20">
-                  <i class="fa-solid fa-code"></i> Text-Code in Zwischenablage
-                </button>
-              </div>
+            <div class="space-y-3">
+              <button onclick="copySyncLink('${currentUrl}')" class="w-full py-3 px-4 bg-brand-accent hover:bg-brand-green text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg">
+                <i class="fa-solid fa-link"></i> Link mit allen Punkten kopieren
+              </button>
+              <button onclick="copyRawCode()" class="w-full py-3 px-4 bg-brand-dark hover:bg-black text-gray-200 font-bold rounded-xl text-xs flex items-center justify-center gap-2 border border-brand-gold/20 shadow-lg">
+                <i class="fa-solid fa-code"></i> Text-Code kopieren
+              </button>
             </div>
           </div>
 
           <div class="glass-panel p-5 rounded-2xl border border-emerald-500/40">
             <h3 class="font-bold text-base text-emerald-400 mb-2"><i class="fa-solid fa-file-import"></i> SCHRITT 2: IMPORT (Daten empfangen)</h3>
-            <p class="text-xs text-gray-300 mb-4">Lies die Punkte per Kamera-Scanner ein oder füge den Link ein.</p>
+            <p class="text-xs text-gray-300 mb-4">Füge den erhaltenen Link oder Text-Code hier ein, um die Punkte zu übernehmen.</p>
 
-            <div class="space-y-4">
-              <button onclick="startCameraScan()" class="w-full py-3 gold-gradient text-brand-dark font-black rounded-xl text-xs shadow-lg flex items-center justify-center gap-2">
-                <i class="fa-solid fa-camera text-base"></i> QR-Code per Kamera scannen
+            <div class="space-y-3">
+              <textarea id="import-text-input" rows="4" placeholder="Füge hier den kopierten Link oder Text-Code ein..." class="w-full p-3 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold"></textarea>
+              <button onclick="processManualImport()" class="w-full py-3 gold-gradient font-bold rounded-xl text-xs text-brand-dark shadow-lg">
+                Punkte aus Text/Link einlesen & zusammenführen
               </button>
-
-              <div id="qr-reader" class="hidden overflow-hidden rounded-xl border border-brand-gold"></div>
-
-              <div class="space-y-2">
-                <label class="text-xs font-bold text-gray-300">Code oder Link hier einfügen:</label>
-                <textarea id="import-text-input" rows="3" placeholder="Füge hier den Link oder Text-Code ein..." class="w-full p-3 bg-brand-dark border border-brand-gold/30 rounded-xl text-xs text-white focus:outline-none focus:border-brand-gold"></textarea>
-                <button onclick="processManualImport()" class="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 font-bold rounded-xl text-xs text-white">
-                  Punkte einlesen & zusammenführen
-                </button>
-              </div>
             </div>
           </div>
         </div>
       `;
 
       container.innerHTML = html;
-
-      setTimeout(() => {
-        const qrElem = document.getElementById('qrcode-container');
-        if (qrElem) {
-          qrElem.innerHTML = '';
-          new QRCode(qrElem, {
-            text: jsonStr,
-            width: 160,
-            height: 160,
-            correctLevel: QRCode.CorrectLevel.L
-          });
-        }
-      }, 50);
     }
 
     function selectTeamForPosten(pKey, teamName) {
@@ -631,7 +598,6 @@
       }
     }
 
-    // Modal-Funktionen für Teams zusammenfassen
     function openMergeModal() {
       if (appData.teams.length < 2) {
         return alert("Es sind nicht genügend Teams zum Zusammenfassen vorhanden.");
@@ -713,12 +679,13 @@
       try {
         let rawJson = input;
         if (input.includes('?data=')) {
-          rawJson = decodeURIComponent(input.split('?data=')[1]);
+          const parts = input.split('?data=');
+          rawJson = decodeURIComponent(parts[1].split('&')[0]);
         }
         const importedData = JSON.parse(rawJson);
         mergeData(importedData);
       } catch (e) {
-        alert("Ungültiger Code oder Link!");
+        alert("Ungültiger Code oder Link! Bitte überprüfe die Eingabe.");
       }
     }
 
@@ -741,37 +708,6 @@
       saveData();
       alert("Punkte erfolgreich synchronisiert!");
       switchTab('spielleiter');
-    }
-
-    function startCameraScan() {
-      const readerElem = document.getElementById('qr-reader');
-      readerElem.classList.remove('hidden');
-
-      if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("qr-reader");
-      }
-
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          html5QrCode.stop().then(() => {
-            readerElem.classList.add('hidden');
-            try {
-              let jsonStr = decodedText;
-              if (decodedText.includes('?data=')) {
-                jsonStr = decodeURIComponent(decodedText.split('?data=')[1]);
-              }
-              mergeData(JSON.parse(jsonStr));
-            } catch (e) {
-              alert("Ungültige QR-Code Daten.");
-            }
-          });
-        },
-        () => {}
-      ).catch(err => {
-        alert("Kamera konnte nicht gestartet werden.");
-      });
     }
 
     function checkUrlParamsForData() {
